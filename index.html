@@ -4,11 +4,17 @@
   <meta charset="UTF-8">
   <title>Collaborative Drawing</title>
   <style>
-    body { margin: 0; overflow: hidden; }
-    canvas { 
-      border: 1px solid black; 
-      display: block; 
-      margin: auto; 
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      width: 100%;
+      overflow: hidden; /* prevent scrolling */
+    }
+    canvas {
+      display: block;
+      width: 100vw;   /* viewport width */
+      height: 100vh;  /* viewport height */
       touch-action: none; /* allow finger drawing */
     }
     #clearBtn {
@@ -50,10 +56,10 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // Canvas setup
     const canvas = document.getElementById("drawCanvas");
     const ctx = canvas.getContext("2d");
 
+    // Always resize canvas to fit screen
     function resizeCanvas() {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
@@ -91,29 +97,26 @@
       e.preventDefault();
       const [x, y] = getPos(e);
 
-      // Draw locally
       ctx.beginPath();
       ctx.moveTo(prevX, prevY);
       ctx.lineTo(x, y);
       ctx.stroke();
 
-      // Save stroke to Firebase
       db.ref("strokes").push({ x1: prevX, y1: prevY, x2: x, y2: y });
-
       [prevX, prevY] = [x, y];
     }
 
-    // Mouse events
+    // Mouse
     canvas.addEventListener("mousedown", startDraw);
     canvas.addEventListener("mouseup", endDraw);
     canvas.addEventListener("mousemove", draw);
 
-    // Touch events
+    // Touch
     canvas.addEventListener("touchstart", startDraw);
     canvas.addEventListener("touchend", endDraw);
     canvas.addEventListener("touchmove", draw);
 
-    // Listen for strokes from Firebase
+    // Sync strokes from DB
     db.ref("strokes").on("child_added", (snapshot) => {
       const { x1, y1, x2, y2 } = snapshot.val();
       ctx.beginPath();
@@ -122,13 +125,12 @@
       ctx.stroke();
     });
 
-    // Clear button logic
+    // Clear button
     document.getElementById("clearBtn").addEventListener("click", () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      db.ref("strokes").remove(); // clears DB
+      db.ref("strokes").remove();
     });
 
-    // Also clear when database is reset
     db.ref("strokes").on("value", (snapshot) => {
       if (!snapshot.exists()) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
