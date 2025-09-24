@@ -172,6 +172,7 @@ db.ref("strokes").on("child_removed", () => {
 });
 
 // Online counter with persistent user ID
+// Online counter with heartbeat
 let userId = localStorage.getItem("drawUserId");
 if(!userId){
   userId = "user_" + Math.floor(Math.random()*1000000);
@@ -179,16 +180,26 @@ if(!userId){
 }
 
 let userRef = db.ref("online/" + userId);
-userRef.set(true);
+
+// Set initial presence
+userRef.set({ active: true, lastActive: Date.now() });
 userRef.onDisconnect().remove();
 
+// Heartbeat every 30s
+setInterval(()=>{
+  userRef.update({ lastActive: Date.now() });
+}, 30000);
+
+// Count only active users in last 1 min
 db.ref("online").on("value", snapshot=>{
-  onlineCounter.textContent = "Online: " + snapshot.numChildren();
+  const now = Date.now();
+  let count = 0;
+  snapshot.forEach(child=>{
+    const user = child.val();
+    if(user.lastActive && now - user.lastActive < 60000){
+      count++;
+    }
+  });
+  onlineCounter.textContent = "Online: " + count;
 });
 
-document.addEventListener("visibilitychange", ()=>{
-  if(document.visibilityState === "visible"){
-    userRef.set(true);
-    userRef.onDisconnect().remove();
-  }
-});
