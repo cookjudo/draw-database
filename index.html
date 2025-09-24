@@ -1,143 +1,27 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Realtime Drawing</title>
-  <style>
-    body { margin: 0; overflow: hidden; background: #fff; }
-    #controls {
-      position: fixed;
-      top: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(255,255,255,0.9);
-      padding: 10px;
-      border-radius: 8px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.2);
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      z-index: 100;
-    }
-    canvas { display: block; margin: 0; padding: 0; }
-  </style>
+<meta charset="UTF-8">
+<title>Draw Database</title>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div id="controls">
-    <button id="drawBtn">Draw</button>
-    <button id="eraseBtn">Erase</button>
+<div id="controls">
+  <div class="buttons">
+    <button id="drawEraseBtn">Erase</button>
     <button id="clearBtn">Clear Canvas</button>
-    <label>Size: <input type="range" id="sizeSlider" min="1" max="50" value="5"></label>
-    <span id="onlineCount">Online: 0</span>
   </div>
-  <canvas id="canvas"></canvas>
+  <div id="sizeContainer">
+    <label for="sizeSlider">Size:</label>
+    <input type="range" id="sizeSlider" min="1" max="50" value="4">
+  </div>
+  <div id="onlineCounter">Online: 0</div>
+</div>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
-    import { getDatabase, ref, onChildAdded, onChildRemoved, push, remove, set, onValue, onDisconnect } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-database.js";
+<canvas id="drawCanvas"></canvas>
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyCRyA_LYMiQsSGar9MCkhwrVw6kF2nTaXQ",
-      authDomain: "draw-database-9eeba.firebaseapp.com",
-      databaseURL: "https://draw-database-9eeba-default-rtdb.firebaseio.com",
-      projectId: "draw-database-9eeba",
-      storageBucket: "draw-database-9eeba.firebasestorage.app",
-      messagingSenderId: "351896382644",
-      appId: "1:351896382644:web:a2cd022686853da146fbe1",
-      measurementId: "G-9TJ9926RHS"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
-
-    // --- Canvas Setup ---
-    const canvas = document.getElementById("canvas");
-    const ctx = canvas.getContext("2d");
-    function resizeCanvas() {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-    }
-    window.addEventListener("resize", resizeCanvas);
-    resizeCanvas();
-
-    let drawing = false;
-    let erasing = false;
-    let size = 5;
-
-    const drawBtn = document.getElementById("drawBtn");
-    const eraseBtn = document.getElementById("eraseBtn");
-    const clearBtn = document.getElementById("clearBtn");
-    const sizeSlider = document.getElementById("sizeSlider");
-    const onlineCount = document.getElementById("onlineCount");
-
-    sizeSlider.addEventListener("input", e => { size = e.target.value; });
-    drawBtn.addEventListener("click", () => { erasing = false; });
-    eraseBtn.addEventListener("click", () => { erasing = true; });
-
-    clearBtn.addEventListener("click", () => {
-      const confirmClear = confirm("Are you sure you want to clear the canvas for everyone?");
-      if (!confirmClear) return;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      remove(ref(db, "strokes"));
-    });
-
-    function getPos(e) {
-      if (e.touches) e = e.touches[0];
-      return { x: e.clientX, y: e.clientY };
-    }
-
-    function startDraw(e) {
-      drawing = true;
-      draw(e);
-    }
-
-    function endDraw() {
-      drawing = false;
-      ctx.beginPath();
-    }
-
-    function draw(e) {
-      if (!drawing) return;
-      const pos = getPos(e);
-      const stroke = {
-        x: pos.x,
-        y: pos.y,
-        size: size,
-        erase: erasing
-      };
-      push(ref(db, "strokes"), stroke);
-    }
-
-    canvas.addEventListener("mousedown", startDraw);
-    canvas.addEventListener("touchstart", startDraw);
-    canvas.addEventListener("mouseup", endDraw);
-    canvas.addEventListener("mouseleave", endDraw);
-    canvas.addEventListener("touchend", endDraw);
-    canvas.addEventListener("mousemove", draw);
-    canvas.addEventListener("touchmove", draw);
-
-    // --- Draw from database ---
-    onChildAdded(ref(db, "strokes"), (snap) => {
-      const s = snap.val();
-      ctx.beginPath();
-      ctx.arc(s.x, s.y, s.size/2, 0, 2 * Math.PI);
-      ctx.fillStyle = s.erase ? "#fff" : "#000";
-      ctx.fill();
-    });
-
-    // Remove erased strokes
-    onChildRemoved(ref(db, "strokes"), () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-    });
-
-    // --- Online Counter ---
-    const onlineRef = ref(db, "online");
-    const userRef = push(onlineRef);
-    set(userRef, true);
-    onDisconnect(userRef).remove();
-
-    onValue(onlineRef, (snap) => {
-      onlineCount.innerText = "Online: " + snap.size;
-    });
-  </script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script src="app.js"></script>
 </body>
 </html>
