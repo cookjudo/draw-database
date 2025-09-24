@@ -49,7 +49,7 @@ button {
 #drawEraseBtn { 
   background-color: #4CAF50; 
   color:white; 
-  width: 70px; /* fixed width so text toggle doesn't resize button */
+  width: 70px; 
 }
 #clearBtn { background-color: red; color:white; }
 #sizeContainer {
@@ -106,7 +106,6 @@ const db = firebase.database();
 
 const canvas = document.getElementById("drawCanvas");
 const ctx = canvas.getContext("2d");
-
 const CANVAS_WIDTH = 1200;
 const CANVAS_HEIGHT = 800;
 canvas.width = CANVAS_WIDTH;
@@ -147,10 +146,7 @@ function endDraw(e){
   prevX = prevY = null;
 }
 
-// Throttle points for batching
-let localStrokes = [];
-const BATCH_INTERVAL = 50; // ms
-
+// Smooth drawing with micro-throttle
 function draw(e){
   if(!drawing) return;
   e.preventDefault();
@@ -173,37 +169,21 @@ function draw(e){
   prevY = y;
 }
 
-// Draw a single circle locally
+// Draw a single circle locally AND push immediately
 function drawDot(x, y){
   ctx.beginPath();
   ctx.arc(x, y, lineWidth/2, 0, Math.PI*2);
   ctx.fillStyle="black";
   ctx.fill();
-  localStrokes.push({x,y,size:lineWidth});
+  db.ref("strokes").push({x,y,size:lineWidth});
 }
-
-// Batch sending points to Firebase
-setInterval(()=>{
-  if(localStrokes.length>0){
-    const batch = localStrokes;
-    localStrokes = [];
-    db.ref("strokes").push(batch);
-  }
-}, BATCH_INTERVAL);
 
 // Erase overlapping strokes from Firebase
 function eraseAt(x, y){
   db.ref("strokes").once("value", snapshot=>{
     snapshot.forEach(child=>{
-      const val = child.val();
-      if(Array.isArray(val)){ // batch
-        let keep = val.filter(p => Math.hypot(x-p.x, y-p.y) >= lineWidth/2 + p.size/2);
-        if(keep.length === 0) child.ref.remove();
-        else child.ref.set(keep);
-      } else {
-        const {x: sx, y: sy, size} = val;
-        if(Math.hypot(x-sx, y-sy) < lineWidth/2 + size/2) child.ref.remove();
-      }
+      const {x: sx, y: sy, size} = child.val();
+      if(Math.hypot(x-sx, y-sy) < lineWidth/2 + size/2) child.ref.remove();
     });
   });
   ctx.clearRect(x-lineWidth/2, y-lineWidth/2, lineWidth, lineWidth);
@@ -234,21 +214,11 @@ clearBtn.addEventListener("click", ()=>{
 
 // Render strokes from Firebase
 db.ref("strokes").on("child_added", snapshot=>{
-  const val = snapshot.val();
-  if(Array.isArray(val)){
-    val.forEach(p=>{
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.size/2,0,Math.PI*2);
-      ctx.fillStyle="black";
-      ctx.fill();
-    });
-  } else {
-    const {x,y,size} = val;
-    ctx.beginPath();
-    ctx.arc(x,y,size/2,0,Math.PI*2);
-    ctx.fillStyle="black";
-    ctx.fill();
-  }
+  const {x,y,size} = snapshot.val();
+  ctx.beginPath();
+  ctx.arc(x,y,size/2,0,Math.PI*2);
+  ctx.fillStyle="black";
+  ctx.fill();
 });
 
 db.ref("strokes").on("child_removed", snapshot=>{ redrawAll(); });
@@ -258,21 +228,11 @@ function redrawAll(){
   ctx.clearRect(0,0,CANVAS_WIDTH,CANVAS_HEIGHT);
   db.ref("strokes").once("value", snapshot=>{
     snapshot.forEach(child=>{
-      const val = child.val();
-      if(Array.isArray(val)){
-        val.forEach(p=>{
-          ctx.beginPath();
-          ctx.arc(p.x,p.y,p.size/2,0,Math.PI*2);
-          ctx.fillStyle="black";
-          ctx.fill();
-        });
-      } else {
-        const {x,y,size} = val;
-        ctx.beginPath();
-        ctx.arc(x,y,size/2,0,Math.PI*2);
-        ctx.fillStyle="black";
-        ctx.fill();
-      }
+      const {x,y,size} = child.val();
+      ctx.beginPath();
+      ctx.arc(x,y,size/2,0,Math.PI*2);
+      ctx.fillStyle="black";
+      ctx.fill();
     });
   });
 }
