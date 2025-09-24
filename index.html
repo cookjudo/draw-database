@@ -5,7 +5,12 @@
   <title>Collaborative Drawing</title>
   <style>
     body { margin: 0; overflow: hidden; }
-    canvas { border: 1px solid black; display: block; margin: auto; }
+    canvas { 
+      border: 1px solid black; 
+      display: block; 
+      margin: auto; 
+      touch-action: none; /* allow finger drawing */
+    }
   </style>
 </head>
 <body>
@@ -16,7 +21,7 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
   <script>
-    // Your Firebase config
+    // Firebase config
     const firebaseConfig = {
       apiKey: "AIzaSyCRyA_LYMiQsSGar9MCkhwrVw6kF2nTaXQ",
       authDomain: "draw-database-9eeba.firebaseapp.com",
@@ -28,36 +33,50 @@
       measurementId: "G-9TJ9926RHS"
     };
 
-    // Initialize Firebase
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
     // Canvas setup
     const canvas = document.getElementById("drawCanvas");
     const ctx = canvas.getContext("2d");
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
 
-    ctx.lineWidth = 2;
-    ctx.lineCap = "round";
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      ctx.lineWidth = 2;
+      ctx.lineCap = "round";
+    }
+
+    // Initial size + resize on window change
+    resizeCanvas();
+    window.addEventListener("resize", resizeCanvas);
 
     let drawing = false;
     let prevX = 0, prevY = 0;
 
-    // Start drawing
-    canvas.addEventListener("mousedown", (e) => {
+    function getPos(e) {
+      if (e.touches && e.touches.length > 0) {
+        return [e.touches[0].clientX, e.touches[0].clientY];
+      } else {
+        return [e.clientX, e.clientY];
+      }
+    }
+
+    function startDraw(e) {
+      e.preventDefault();
       drawing = true;
-      [prevX, prevY] = [e.clientX, e.clientY];
-    });
+      [prevX, prevY] = getPos(e);
+    }
 
-    canvas.addEventListener("mouseup", () => {
+    function endDraw(e) {
+      e.preventDefault();
       drawing = false;
-    });
+    }
 
-    // Draw and push strokes to Firebase
-    canvas.addEventListener("mousemove", (e) => {
+    function draw(e) {
       if (!drawing) return;
-      const [x, y] = [e.clientX, e.clientY];
+      e.preventDefault();
+      const [x, y] = getPos(e);
 
       // Draw locally
       ctx.beginPath();
@@ -69,7 +88,17 @@
       db.ref("strokes").push({ x1: prevX, y1: prevY, x2: x, y2: y });
 
       [prevX, prevY] = [x, y];
-    });
+    }
+
+    // Mouse events
+    canvas.addEventListener("mousedown", startDraw);
+    canvas.addEventListener("mouseup", endDraw);
+    canvas.addEventListener("mousemove", draw);
+
+    // Touch events
+    canvas.addEventListener("touchstart", startDraw);
+    canvas.addEventListener("touchend", endDraw);
+    canvas.addEventListener("touchmove", draw);
 
     // Listen for strokes from Firebase
     db.ref("strokes").on("child_added", (snapshot) => {
