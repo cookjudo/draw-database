@@ -63,16 +63,10 @@ function draw(e){
   const [x, y] = getCanvasCoords(e);
   if(prevX === null || prevY === null){ prevX = x; prevY = y; }
 
-  const dx = x - prevX;
-  const dy = y - prevY;
-  const distance = Math.hypot(dx, dy);
-  const step = Math.max(lineWidth * 0.25, 1);
-
-  for(let i=0; i<distance; i+=step){
-    const cx = prevX + dx * (i/distance);
-    const cy = prevY + dy * (i/distance);
-    if(eraseMode) eraseLocally(cx, cy);
-    else drawLocally(cx, cy);
+  if(eraseMode) {
+    eraseLocally(x, y);
+  } else {
+    drawLocally(x, y);
   }
 
   prevX = x;
@@ -80,10 +74,16 @@ function draw(e){
 }
 
 function drawLocally(x, y){
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = "black";
+  ctx.lineWidth = lineWidth;
+
   ctx.beginPath();
-  ctx.arc(x, y, lineWidth/2, 0, Math.PI*2);
-  ctx.fillStyle="black";
-  ctx.fill();
+  ctx.moveTo(prevX, prevY);
+  ctx.lineTo(x, y);
+  ctx.stroke();
+
   strokeBatch.push({x, y, size: lineWidth});
 }
 
@@ -95,13 +95,15 @@ function eraseLocally(x, y){
   ctx.fill();
   ctx.restore();
 
-  // Remove strokes from database that are within eraser circle
+  // Remove only if the full dot is covered
   db.ref("strokes").once("value", snapshot => {
     snapshot.forEach(child => {
       const s = child.val();
       const dx = s.x - x;
       const dy = s.y - y;
-      if(Math.hypot(dx, dy) <= lineWidth/2){
+      const distance = Math.hypot(dx, dy);
+
+      if(distance + s.size/2 <= lineWidth/2){  
         db.ref("strokes/" + child.key).remove();
       }
     });
@@ -200,4 +202,3 @@ db.ref("online").on("value", snapshot=>{
   });
   onlineCounter.textContent = "Online: " + count;
 });
-
