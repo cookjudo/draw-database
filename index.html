@@ -11,9 +11,23 @@
       margin: auto; 
       touch-action: none; /* allow finger drawing */
     }
+    #clearBtn {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      z-index: 10;
+      padding: 10px 20px;
+      background: red;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
+  <button id="clearBtn">Clear Canvas</button>
   <canvas id="drawCanvas"></canvas>
 
   <!-- Firebase v8 SDK -->
@@ -47,7 +61,6 @@
       ctx.lineCap = "round";
     }
 
-    // Initial size + resize on window change
     resizeCanvas();
     window.addEventListener("resize", resizeCanvas);
 
@@ -107,6 +120,19 @@
       ctx.moveTo(x1, y1);
       ctx.lineTo(x2, y2);
       ctx.stroke();
+    });
+
+    // Clear button logic
+    document.getElementById("clearBtn").addEventListener("click", () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      db.ref("strokes").remove(); // clears DB
+    });
+
+    // Also clear when database is reset
+    db.ref("strokes").on("value", (snapshot) => {
+      if (!snapshot.exists()) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
     });
   </script>
 </body>
