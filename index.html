@@ -1,27 +1,43 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Draw</title>
-<link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Realtime Drawing App</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-<div id="controls">
-  <div class="buttons">
-    <button id="drawEraseBtn">Erase</button>
-    <button id="clearBtn">Clear Canvas</button>
-  </div>
-  <div id="sizeContainer">
-    <label for="sizeSlider">Size:</label>
-    <input type="range" id="sizeSlider" min="1" max="50" value="4">
-  </div>
-  <div id="onlineCounter">Online: 0</div>
-</div>
+  <canvas id="drawingCanvas"></canvas>
 
-<canvas id="drawCanvas"></canvas>
+  <!-- Toggle Menu Button -->
+  <button id="menuToggle">☰ Menu</button>
 
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-<script src="app.js"></script>
+  <!-- Popup Menu -->
+  <div id="menu" class="hidden">
+    <div class="menu-section">
+      <button id="drawBtn">✏️ Draw</button>
+      <button id="eraseBtn">🩹 Erase</button>
+      <button id="clearBtn">🧹 Clear</button>
+    </div>
+
+    <div class="menu-section">
+      <label for="sizeSlider">Size: </label>
+      <input type="range" id="sizeSlider" min="2" max="50" value="5">
+    </div>
+
+    <div class="menu-section">
+      <p>Color (RGB):</p>
+      <label>R: <input type="range" id="rSlider" min="0" max="255" value="0"></label>
+      <label>G: <input type="range" id="gSlider" min="0" max="255" value="0"></label>
+      <label>B: <input type="range" id="bSlider" min="0" max="255" value="0"></label>
+      <div id="colorPreview"></div>
+    </div>
+
+    <div class="menu-section">
+      <p>Users online: <span id="onlineCount">0</span></p>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
 </body>
 </html>
