@@ -121,7 +121,6 @@ const clearBtn = document.getElementById("clearBtn");
 const sizeSlider = document.getElementById("sizeSlider");
 const onlineCounter = document.getElementById("onlineCounter");
 
-// Update brush/eraser size
 sizeSlider.addEventListener("input", () => { lineWidth = parseInt(sizeSlider.value); });
 
 function getCanvasCoords(e){
@@ -146,7 +145,7 @@ function endDraw(e){
   prevX = prevY = null;
 }
 
-// Smooth drawing with micro-throttle
+// Smooth drawing
 function draw(e){
   if(!drawing) return;
   e.preventDefault();
@@ -169,96 +168,10 @@ function draw(e){
   prevY = y;
 }
 
-// Draw a single circle locally AND push immediately
+// Draw circle and push to Firebase immediately
 function drawDot(x, y){
   ctx.beginPath();
   ctx.arc(x, y, lineWidth/2, 0, Math.PI*2);
   ctx.fillStyle="black";
   ctx.fill();
-  db.ref("strokes").push({x,y,size:lineWidth});
-}
-
-// Erase overlapping strokes from Firebase
-function eraseAt(x, y){
-  db.ref("strokes").once("value", snapshot=>{
-    snapshot.forEach(child=>{
-      const {x: sx, y: sy, size} = child.val();
-      if(Math.hypot(x-sx, y-sy) < lineWidth/2 + size/2) child.ref.remove();
-    });
-  });
-  ctx.clearRect(x-lineWidth/2, y-lineWidth/2, lineWidth, lineWidth);
-}
-
-// Mouse events
-canvas.addEventListener("mousedown", startDraw);
-canvas.addEventListener("mouseup", endDraw);
-canvas.addEventListener("mousemove", draw);
-
-// Touch events
-canvas.addEventListener("touchstart", startDraw);
-canvas.addEventListener("touchend", endDraw);
-canvas.addEventListener("touchmove", draw);
-
-// Toggle erase/draw
-drawEraseBtn.addEventListener("click", ()=>{
-  eraseMode=!eraseMode;
-  drawEraseBtn.textContent=eraseMode?"Draw":"Erase";
-  drawEraseBtn.style.backgroundColor=eraseMode?"#2196F3":"#4CAF50";
-});
-
-// Clear canvas
-clearBtn.addEventListener("click", ()=>{
-  ctx.clearRect(0,0,CANVAS_WIDTH,CANVAS_HEIGHT);
-  db.ref("strokes").remove();
-});
-
-// Render strokes from Firebase
-db.ref("strokes").on("child_added", snapshot=>{
-  const {x,y,size} = snapshot.val();
-  ctx.beginPath();
-  ctx.arc(x,y,size/2,0,Math.PI*2);
-  ctx.fillStyle="black";
-  ctx.fill();
-});
-
-db.ref("strokes").on("child_removed", snapshot=>{ redrawAll(); });
-
-// Redraw all strokes after deletion
-function redrawAll(){
-  ctx.clearRect(0,0,CANVAS_WIDTH,CANVAS_HEIGHT);
-  db.ref("strokes").once("value", snapshot=>{
-    snapshot.forEach(child=>{
-      const {x,y,size} = child.val();
-      ctx.beginPath();
-      ctx.arc(x,y,size/2,0,Math.PI*2);
-      ctx.fillStyle="black";
-      ctx.fill();
-    });
-  });
-}
-
-// Online counter with mobile visibility fix
-let userRef = db.ref("online/" + Math.floor(Math.random()*1000000));
-
-function registerOnline(){
-  userRef.set(true);
-  userRef.onDisconnect().remove();
-}
-
-// Initial registration
-registerOnline();
-
-// Update online counter
-db.ref("online").on("value", snapshot=>{
-  onlineCounter.textContent = "Online: " + snapshot.numChildren();
-});
-
-// Re-register when page becomes visible (mobile unlock)
-document.addEventListener("visibilitychange", ()=>{
-  if(document.visibilityState === "visible"){
-    registerOnline();
-  }
-});
-</script>
-</body>
-</html>
+  db.ref("strokes").push({x,y,size:l
