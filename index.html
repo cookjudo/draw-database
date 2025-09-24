@@ -33,8 +33,12 @@ canvas {
   background-color: rgba(0,0,0,0.4);
   padding: 10px;
   border-radius: 8px;
+  width: max-content;
 }
-.buttons { display: flex; gap: 10px; }
+.buttons {
+  display: flex;
+  gap: 10px;
+}
 button {
   padding: 10px 15px;
   border: none;
@@ -49,8 +53,9 @@ button {
   align-items: center;
   gap: 5px;
   margin-top: 5px;
+  width: 100%;
 }
-#sizeSlider { width: 120px; cursor:pointer; }
+#sizeSlider { width: 100%; cursor:pointer; }
 #onlineCounter {
   margin-top: 5px;
   background-color: #333;
@@ -139,7 +144,7 @@ function endDraw(e){
   prevX = prevY = null;
 }
 
-// Draw continuously using interpolation
+// Smooth drawing with step based on brush size
 function draw(e){
   if(!drawing) return;
   e.preventDefault();
@@ -149,7 +154,7 @@ function draw(e){
   const dx = x - prevX;
   const dy = y - prevY;
   const distance = Math.hypot(dx, dy);
-  const step = Math.max(1, lineWidth/2);
+  const step = Math.max(lineWidth*0.25, 1); // smaller overlap for cleaner strokes
 
   for(let i=0; i<distance; i+=step){
     const cx = prevX + dx * (i/distance);
