@@ -145,7 +145,7 @@ function endDraw(e){
   prevX = prevY = null;
 }
 
-// Local micro-batch arrays
+// Micro-batch arrays
 let localStrokes = [];
 let localErasures = [];
 const BATCH_INTERVAL = 30; // ms
@@ -172,23 +172,27 @@ function draw(e){
   prevY = y;
 }
 
-// Draw circle locally and batch
+// Draw circle stroke locally
 function drawLocally(x, y){
   ctx.beginPath();
   ctx.arc(x, y, lineWidth/2, 0, Math.PI*2);
   ctx.fillStyle="black";
   ctx.fill();
-  // Push each stroke with unique key
   localStrokes.push({x, y, size: lineWidth});
 }
 
-// Erase locally and batch
+// Erase using circular brush
 function eraseLocally(x, y){
-  ctx.clearRect(x-lineWidth/2, y-lineWidth/2, lineWidth, lineWidth);
+  ctx.save();
+  ctx.globalCompositeOperation = 'destination-out';
+  ctx.beginPath();
+  ctx.arc(x, y, lineWidth/2, 0, Math.PI*2);
+  ctx.fill();
+  ctx.restore();
   localErasures.push({x, y, size: lineWidth});
 }
 
-// Push batches periodically
+// Push batches to Firebase
 setInterval(()=>{
   if(localStrokes.length>0){
     localStrokes.forEach(s=>{
@@ -198,7 +202,6 @@ setInterval(()=>{
   }
   if(localErasures.length>0){
     localErasures.forEach(e=>{
-      // Query strokes within erase radius
       db.ref("strokes").once("value", snapshot=>{
         snapshot.forEach(child=>{
           const {x, y, size} = child.val();
@@ -234,7 +237,7 @@ clearBtn.addEventListener("click", ()=>{
   db.ref("strokes").remove();
 });
 
-// Render strokes
+// Render strokes from Firebase
 db.ref("strokes").on("child_added", snapshot=>{
   const {x, y, size} = snapshot.val();
   ctx.beginPath();
