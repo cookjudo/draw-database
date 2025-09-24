@@ -1,15 +1,24 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import { getDatabase, ref, onChildAdded, onChildRemoved, push, remove, onValue, serverTimestamp, set } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+import { 
+  getDatabase, 
+  ref, 
+  onChildAdded, 
+  onChildRemoved, 
+  push, 
+  remove, 
+  onValue, 
+  set 
+} from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
 
-// ✅ Firebase config (safe to expose in frontend)
+// ✅ Your Firebase config (safe to use on client)
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "yourapp.firebaseapp.com",
-  databaseURL: "https://yourapp-default-rtdb.firebaseio.com",
-  projectId: "yourapp",
-  storageBucket: "yourapp.appspot.com",
-  messagingSenderId: "123456789",
-  appId: "1:123456789:web:xxxx"
+  apiKey: "AIzaSyBOVGJ-wo9TFlzxZNm-C8MWfJDRYHEv_o4",
+  authDomain: "fir-draw-f6f6b.firebaseapp.com",
+  databaseURL: "https://fir-draw-f6f6b-default-rtdb.firebaseio.com",
+  projectId: "fir-draw-f6f6b",
+  storageBucket: "fir-draw-f6f6b.appspot.com",
+  messagingSenderId: "278260217358",
+  appId: "1:278260217358:web:1a306b40537e5ae6fefb97"
 };
 
 const app = initializeApp(firebaseConfig);
