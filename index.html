@@ -265,10 +265,17 @@ db.ref("erase").on("child_removed", () => {
   ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 });
 
-// Online counter
-let userRef = db.ref("online/" + Math.floor(Math.random()*1000000));
+// Online counter with persistent user ID
+let userId = localStorage.getItem("drawUserId");
+if(!userId){
+  userId = "user_" + Math.floor(Math.random()*1000000);
+  localStorage.setItem("drawUserId", userId);
+}
+
+let userRef = db.ref("online/" + userId);
 userRef.set(true);
 userRef.onDisconnect().remove();
+
 db.ref("online").on("value", snapshot=>{
   onlineCounter.textContent = "Online: " + snapshot.numChildren();
 });
