@@ -146,7 +146,7 @@ function endDraw(e){
   prevX = prevY = null;
 }
 
-// Optimized batching
+// Batches for smooth drawing
 let strokeBatch = [];
 let eraseBatch = [];
 const BATCH_INTERVAL = 50; // ms
@@ -173,7 +173,6 @@ function draw(e){
   prevY = y;
 }
 
-// Draw circle stroke locally
 function drawLocally(x, y){
   ctx.beginPath();
   ctx.arc(x, y, lineWidth/2, 0, Math.PI*2);
@@ -182,7 +181,6 @@ function drawLocally(x, y){
   strokeBatch.push({x, y, size: lineWidth});
 }
 
-// Erase using circular brush
 function eraseLocally(x, y){
   ctx.save();
   ctx.globalCompositeOperation = 'destination-out';
@@ -193,41 +191,29 @@ function eraseLocally(x, y){
   eraseBatch.push({x, y, size: lineWidth});
 }
 
-// Batch upload strokes/erasures
+// Push strokes and erase events
 setInterval(()=>{
   if(strokeBatch.length>0){
     const batch = {};
-    strokeBatch.forEach(s => {
+    strokeBatch.forEach(s=>{
       const key = db.ref("strokes").push().key;
       batch[key] = s;
     });
     db.ref("strokes").update(batch);
     strokeBatch = [];
   }
-
   if(eraseBatch.length>0){
-    // Fetch strokes once
-    db.ref("strokes").once("value", snapshot=>{
-      const toRemove = [];
-      snapshot.forEach(child=>{
-        const {x, y, size} = child.val();
-        eraseBatch.forEach(e=>{
-          const distance = Math.hypot(x - e.x, y - e.y);
-          if(distance < (size/2 + e.size/2)){
-            toRemove.push(child.key);
-          }
-        });
-      });
-      // Remove in one batch
-      const removeBatch = {};
-      toRemove.forEach(key => removeBatch[key] = null);
-      db.ref("strokes").update(removeBatch);
+    const batch = {};
+    eraseBatch.forEach(e=>{
+      const key = db.ref("erase").push().key;
+      batch[key] = e;
     });
+    db.ref("erase").update(batch);
     eraseBatch = [];
   }
 }, BATCH_INTERVAL);
 
-// Mouse & touch events
+// Events
 canvas.addEventListener("mousedown", startDraw);
 canvas.addEventListener("mouseup", endDraw);
 canvas.addEventListener("mousemove", draw);
@@ -235,11 +221,11 @@ canvas.addEventListener("touchstart", startDraw);
 canvas.addEventListener("touchend", endDraw);
 canvas.addEventListener("touchmove", draw);
 
-// Toggle draw/erase
+// Draw/Erase toggle
 drawEraseBtn.addEventListener("click", ()=>{
-  eraseMode=!eraseMode;
-  drawEraseBtn.textContent=eraseMode?"Draw":"Erase";
-  drawEraseBtn.style.backgroundColor=eraseMode?"#2196F3":"#4CAF50";
+  eraseMode = !eraseMode;
+  drawEraseBtn.textContent = eraseMode?"Draw":"Erase";
+  drawEraseBtn.style.backgroundColor = eraseMode?"#2196F3":"#4CAF50";
 });
 
 // Clear canvas
@@ -249,16 +235,28 @@ clearBtn.addEventListener("click", ()=>{
     strokeBatch = [];
     eraseBatch = [];
     db.ref("strokes").remove();
+    db.ref("erase").remove();
   }
 });
 
-// Render strokes from Firebase
+// Render strokes
 db.ref("strokes").on("child_added", snapshot=>{
   const {x, y, size} = snapshot.val();
   ctx.beginPath();
   ctx.arc(x, y, size/2, 0, Math.PI*2);
   ctx.fillStyle="black";
   ctx.fill();
+});
+
+// Render erases
+db.ref("erase").on("child_added", snapshot=>{
+  const {x, y, size} = snapshot.val();
+  ctx.save();
+  ctx.globalCompositeOperation = 'destination-out';
+  ctx.beginPath();
+  ctx.arc(x, y, size/2, 0, Math.PI*2);
+  ctx.fill();
+  ctx.restore();
 });
 
 // Online counter
