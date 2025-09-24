@@ -178,6 +178,7 @@ function drawLocally(x, y){
   ctx.arc(x, y, lineWidth/2, 0, Math.PI*2);
   ctx.fillStyle="black";
   ctx.fill();
+  // Push each stroke with unique key
   localStrokes.push({x, y, size: lineWidth});
 }
 
@@ -187,17 +188,28 @@ function eraseLocally(x, y){
   localErasures.push({x, y, size: lineWidth});
 }
 
-// Send batches to Firebase
+// Push batches periodically
 setInterval(()=>{
   if(localStrokes.length>0){
-    const batch = localStrokes;
+    localStrokes.forEach(s=>{
+      db.ref("strokes").push(s);
+    });
     localStrokes = [];
-    db.ref("strokes").push(batch);
   }
   if(localErasures.length>0){
-    const batch = localErasures;
+    localErasures.forEach(e=>{
+      // Query strokes within erase radius
+      db.ref("strokes").once("value", snapshot=>{
+        snapshot.forEach(child=>{
+          const {x, y, size} = child.val();
+          const distance = Math.hypot(x - e.x, y - e.y);
+          if(distance < (size/2 + e.size/2)){
+            child.ref.remove();
+          }
+        });
+      });
+    });
     localErasures = [];
-    db.ref("erasures").push(batch);
   }
 }, BATCH_INTERVAL);
 
@@ -220,51 +232,18 @@ drawEraseBtn.addEventListener("click", ()=>{
 clearBtn.addEventListener("click", ()=>{
   ctx.clearRect(0,0,CANVAS_WIDTH,CANVAS_HEIGHT);
   db.ref("strokes").remove();
-  db.ref("erasures").remove();
 });
 
-// Render strokes from Firebase
+// Render strokes
 db.ref("strokes").on("child_added", snapshot=>{
-  const val = snapshot.val();
-  if(Array.isArray(val)){
-    val.forEach(p=>{
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.size/2, 0, Math.PI*2);
-      ctx.fillStyle="black";
-      ctx.fill();
-    });
-  }
+  const {x, y, size} = snapshot.val();
+  ctx.beginPath();
+  ctx.arc(x, y, size/2, 0, Math.PI*2);
+  ctx.fillStyle="black";
+  ctx.fill();
 });
 
-// Apply erasures from Firebase
-db.ref("erasures").on("child_added", snapshot=>{
-  const val = snapshot.val();
-  if(Array.isArray(val)){
-    val.forEach(p=>{
-      ctx.clearRect(p.x-p.size/2, p.y-p.size/2, p.size, p.size);
-    });
-  }
-});
-
-// Redraw all strokes after clearing
-function redrawAll(){
-  ctx.clearRect(0,0,CANVAS_WIDTH,CANVAS_HEIGHT);
-  db.ref("strokes").once("value", snapshot=>{
-    snapshot.forEach(child=>{
-      const val = child.val();
-      if(Array.isArray(val)){
-        val.forEach(p=>{
-          ctx.beginPath();
-          ctx.arc(p.x,p.y,p.size/2,0,Math.PI*2);
-          ctx.fillStyle="black";
-          ctx.fill();
-        });
-      }
-    });
-  });
-}
-
-// Online counter with mobile visibility fix
+// Online counter
 let userRef = db.ref("online/" + Math.floor(Math.random()*1000000));
 function registerOnline(){
   userRef.set(true);
