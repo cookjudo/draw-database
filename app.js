@@ -136,12 +136,16 @@ drawEraseBtn.addEventListener("click", ()=>{
   drawEraseBtn.style.backgroundColor = eraseMode?"#2196F3":"#4CAF50";
 });
 
-// Clear canvas immediately for everyone
+// Clear canvas with warning for everyone
 clearBtn.addEventListener("click", ()=>{
+  const confirmClear = confirm("Are you sure you want to clear?");
+  if(!confirmClear) return;
+
   ctx.clearRect(0,0,CANVAS_WIDTH,CANVAS_HEIGHT);
   strokeBatch = [];
   db.ref("strokes").remove();
 });
+
 
 // Render strokes
 db.ref("strokes").on("child_added", snapshot=>{
