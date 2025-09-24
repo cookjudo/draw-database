@@ -89,6 +89,7 @@ label { color:white; }
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
 <script>
 const firebaseConfig = {
   apiKey: "AIzaSyCRyA_LYMiQsSGar9MCkhwrVw6kF2nTaXQ",
@@ -145,10 +146,10 @@ function endDraw(e){
   prevX = prevY = null;
 }
 
-// Micro-batch arrays
-let localStrokes = [];
-let localErasures = [];
-const BATCH_INTERVAL = 30; // ms
+// Optimized batching
+let strokeBatch = [];
+let eraseBatch = [];
+const BATCH_INTERVAL = 50; // ms
 
 function draw(e){
   if(!drawing) return;
@@ -159,7 +160,7 @@ function draw(e){
   const dx = x - prevX;
   const dy = y - prevY;
   const distance = Math.hypot(dx, dy);
-  const step = Math.max(lineWidth*0.25, 1);
+  const step = Math.max(lineWidth * 0.25, 1);
 
   for(let i=0; i<distance; i+=step){
     const cx = prevX + dx * (i/distance);
@@ -178,7 +179,7 @@ function drawLocally(x, y){
   ctx.arc(x, y, lineWidth/2, 0, Math.PI*2);
   ctx.fillStyle="black";
   ctx.fill();
-  localStrokes.push({x, y, size: lineWidth});
+  strokeBatch.push({x, y, size: lineWidth});
 }
 
 // Erase using circular brush
@@ -189,30 +190,40 @@ function eraseLocally(x, y){
   ctx.arc(x, y, lineWidth/2, 0, Math.PI*2);
   ctx.fill();
   ctx.restore();
-  localErasures.push({x, y, size: lineWidth});
+  eraseBatch.push({x, y, size: lineWidth});
 }
 
-// Push batches to Firebase
+// Batch upload strokes/erasures
 setInterval(()=>{
-  if(localStrokes.length>0){
-    localStrokes.forEach(s=>{
-      db.ref("strokes").push(s);
+  if(strokeBatch.length>0){
+    const batch = {};
+    strokeBatch.forEach(s => {
+      const key = db.ref("strokes").push().key;
+      batch[key] = s;
     });
-    localStrokes = [];
+    db.ref("strokes").update(batch);
+    strokeBatch = [];
   }
-  if(localErasures.length>0){
-    localErasures.forEach(e=>{
-      db.ref("strokes").once("value", snapshot=>{
-        snapshot.forEach(child=>{
-          const {x, y, size} = child.val();
+
+  if(eraseBatch.length>0){
+    // Fetch strokes once
+    db.ref("strokes").once("value", snapshot=>{
+      const toRemove = [];
+      snapshot.forEach(child=>{
+        const {x, y, size} = child.val();
+        eraseBatch.forEach(e=>{
           const distance = Math.hypot(x - e.x, y - e.y);
           if(distance < (size/2 + e.size/2)){
-            child.ref.remove();
+            toRemove.push(child.key);
           }
         });
       });
+      // Remove in one batch
+      const removeBatch = {};
+      toRemove.forEach(key => removeBatch[key] = null);
+      db.ref("strokes").update(removeBatch);
     });
-    localErasures = [];
+    eraseBatch = [];
   }
 }, BATCH_INTERVAL);
 
@@ -233,8 +244,12 @@ drawEraseBtn.addEventListener("click", ()=>{
 
 // Clear canvas
 clearBtn.addEventListener("click", ()=>{
-  ctx.clearRect(0,0,CANVAS_WIDTH,CANVAS_HEIGHT);
-  db.ref("strokes").remove();
+  if(confirm("Are you sure you want to clear the canvas for everyone?")){
+    ctx.clearRect(0,0,CANVAS_WIDTH,CANVAS_HEIGHT);
+    strokeBatch = [];
+    eraseBatch = [];
+    db.ref("strokes").remove();
+  }
 });
 
 // Render strokes from Firebase
@@ -248,17 +263,16 @@ db.ref("strokes").on("child_added", snapshot=>{
 
 // Online counter
 let userRef = db.ref("online/" + Math.floor(Math.random()*1000000));
-function registerOnline(){
-  userRef.set(true);
-  userRef.onDisconnect().remove();
-}
-registerOnline();
+userRef.set(true);
+userRef.onDisconnect().remove();
 db.ref("online").on("value", snapshot=>{
   onlineCounter.textContent = "Online: " + snapshot.numChildren();
 });
+
 document.addEventListener("visibilitychange", ()=>{
   if(document.visibilityState === "visible"){
-    registerOnline();
+    userRef.set(true);
+    userRef.onDisconnect().remove();
   }
 });
 </script>
