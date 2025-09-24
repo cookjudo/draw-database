@@ -89,6 +89,8 @@ label { color:white; }
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+
 <script>
 const firebaseConfig = {
   apiKey: "AIzaSyCRyA_LYMiQsSGar9MCkhwrVw6kF2nTaXQ",
@@ -103,6 +105,12 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
+const auth = firebase.auth();
+
+// Sign in anonymously
+auth.signInAnonymously()
+  .then(() => console.log("Signed in anonymously"))
+  .catch(err => console.error(err));
 
 const canvas = document.getElementById("drawCanvas");
 const ctx = canvas.getContext("2d");
@@ -178,7 +186,7 @@ function drawLocally(x, y){
   ctx.arc(x, y, lineWidth/2, 0, Math.PI*2);
   ctx.fillStyle="black";
   ctx.fill();
-  localStrokes.push({x, y, size: lineWidth});
+  if(auth.currentUser) localStrokes.push({x, y, size: lineWidth});
 }
 
 // Erase using circular brush
@@ -189,7 +197,7 @@ function eraseLocally(x, y){
   ctx.arc(x, y, lineWidth/2, 0, Math.PI*2);
   ctx.fill();
   ctx.restore();
-  localErasures.push({x, y, size: lineWidth});
+  if(auth.currentUser) localErasures.push({x, y, size: lineWidth});
 }
 
 // Push batches to Firebase
@@ -234,7 +242,7 @@ drawEraseBtn.addEventListener("click", ()=>{
 // Clear canvas
 clearBtn.addEventListener("click", ()=>{
   ctx.clearRect(0,0,CANVAS_WIDTH,CANVAS_HEIGHT);
-  db.ref("strokes").remove();
+  if(auth.currentUser) db.ref("strokes").remove();
 });
 
 // Render strokes from Firebase
@@ -247,18 +255,22 @@ db.ref("strokes").on("child_added", snapshot=>{
 });
 
 // Online counter
-let userRef = db.ref("online/" + Math.floor(Math.random()*1000000));
-function registerOnline(){
-  userRef.set(true);
-  userRef.onDisconnect().remove();
-}
-registerOnline();
-db.ref("online").on("value", snapshot=>{
-  onlineCounter.textContent = "Online: " + snapshot.numChildren();
+let userRef;
+auth.onAuthStateChanged(user=>{
+  if(user){
+    userRef = db.ref("online/" + user.uid);
+    userRef.set(true);
+    userRef.onDisconnect().remove();
+    db.ref("online").on("value", snapshot=>{
+      onlineCounter.textContent = "Online: " + snapshot.numChildren();
+    });
+  }
 });
+
 document.addEventListener("visibilitychange", ()=>{
-  if(document.visibilityState === "visible"){
-    registerOnline();
+  if(document.visibilityState === "visible" && auth.currentUser){
+    userRef.set(true);
+    userRef.onDisconnect().remove();
   }
 });
 </script>
