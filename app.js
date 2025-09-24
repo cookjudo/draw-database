@@ -1,22 +1,30 @@
-// app.js
-import { db } from "./firebase.js";
-import { ref, push, set, onValue, remove, update } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-database.js";
-
-// Example: writing a stroke
-function saveStroke(stroke) {
-  const strokesRef = ref(db, "strokes");
-  push(strokesRef, stroke);
+// Online counter with heartbeat
+let userId = localStorage.getItem("drawUserId");
+if(!userId){
+  userId = "user_" + Math.floor(Math.random()*1000000);
+  localStorage.setItem("drawUserId", userId);
 }
 
-// Example: listening for strokes
-const strokesRef = ref(db, "strokes");
-onValue(strokesRef, (snapshot) => {
-  const data = snapshot.val();
-  console.log("Updated strokes:", data);
+let userRef = db.ref("online/" + userId);
+
+// Set initial presence
+userRef.set({ active: true, lastActive: Date.now() });
+userRef.onDisconnect().remove();
+
+// Heartbeat every 30s
+setInterval(()=>{
+  userRef.update({ lastActive: Date.now() });
+}, 30000);
+
+// Count only active users in last 1 min
+db.ref("online").on("value", snapshot=>{
+  const now = Date.now();
+  let count = 0;
+  snapshot.forEach(child=>{
+    const user = child.val();
+    if(user.lastActive && now - user.lastActive < 60000){
+      count++;
+    }
+  });
+  onlineCounter.textContent = "Online: " + count;
 });
-
-// Example: clear canvas
-function clearCanvas() {
-  const strokesRef = ref(db, "strokes");
-  remove(strokesRef);
-}
