@@ -228,7 +228,7 @@ drawEraseBtn.addEventListener("click", ()=>{
   drawEraseBtn.style.backgroundColor = eraseMode?"#2196F3":"#4CAF50";
 });
 
-// Clear canvas immediately
+// Clear canvas immediately for everyone
 clearBtn.addEventListener("click", ()=>{
   ctx.clearRect(0,0,CANVAS_WIDTH,CANVAS_HEIGHT);
   strokeBatch = [];
@@ -255,6 +255,14 @@ db.ref("erase").on("child_added", snapshot=>{
   ctx.arc(x, y, size/2, 0, Math.PI*2);
   ctx.fill();
   ctx.restore();
+});
+
+// Listen for database removals (clear canvas)
+db.ref("strokes").on("child_removed", () => {
+  ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+});
+db.ref("erase").on("child_removed", () => {
+  ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 });
 
 // Online counter
