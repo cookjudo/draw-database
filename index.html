@@ -89,7 +89,6 @@ label { color:white; }
 
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-
 <script>
 const firebaseConfig = {
   apiKey: "AIzaSyCRyA_LYMiQsSGar9MCkhwrVw6kF2nTaXQ",
@@ -234,10 +233,8 @@ drawEraseBtn.addEventListener("click", ()=>{
 
 // Clear canvas
 clearBtn.addEventListener("click", ()=>{
-  if(confirm("Are you sure you want to clear the canvas for everyone?")){
-    ctx.clearRect(0,0,CANVAS_WIDTH,CANVAS_HEIGHT);
-    db.ref("strokes").remove();
-  }
+  ctx.clearRect(0,0,CANVAS_WIDTH,CANVAS_HEIGHT);
+  db.ref("strokes").remove();
 });
 
 // Render strokes from Firebase
@@ -251,16 +248,17 @@ db.ref("strokes").on("child_added", snapshot=>{
 
 // Online counter
 let userRef = db.ref("online/" + Math.floor(Math.random()*1000000));
-userRef.set(true);
-userRef.onDisconnect().remove();
+function registerOnline(){
+  userRef.set(true);
+  userRef.onDisconnect().remove();
+}
+registerOnline();
 db.ref("online").on("value", snapshot=>{
   onlineCounter.textContent = "Online: " + snapshot.numChildren();
 });
-
 document.addEventListener("visibilitychange", ()=>{
   if(document.visibilityState === "visible"){
-    userRef.set(true);
-    userRef.onDisconnect().remove();
+    registerOnline();
   }
 });
 </script>
