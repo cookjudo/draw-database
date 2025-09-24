@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Collaborative Drawing</title>
+  <title>Realtime Drawing</title>
   <style>
     body { margin: 0; }
     canvas { border: 1px solid black; display: block; margin: auto; }
@@ -9,10 +9,30 @@
 </head>
 <body>
   <canvas id="draw" width="800" height="600"></canvas>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js"></script>
+
   <script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyCRyA_LYMiQsSGar9MCkhwrVw6kF2nTaXQ",
+    authDomain: "draw-database-9eeba.firebaseapp.com",
+    databaseURL: "https://draw-database-9eeba-default-rtdb.firebaseio.com",
+    projectId: "draw-database-9eeba",
+    storageBucket: "draw-database-9eeba.firebasestorage.app",
+    messagingSenderId: "351896382644",
+    appId: "1:351896382644:web:a2cd022686853da146fbe1",
+    measurementId: "G-9TJ9926RHS"
+  };
+
+    // Initialize Firebase
+    const app = firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // Canvas setup
     const canvas = document.getElementById("draw");
     const ctx = canvas.getContext("2d");
-
     let drawing = false;
 
     canvas.addEventListener("mousedown", () => drawing = true);
@@ -21,11 +41,24 @@
 
     function draw(e) {
       if (!drawing) return;
+      const x = e.offsetX, y = e.offsetY;
       ctx.fillStyle = "black";
       ctx.beginPath();
-      ctx.arc(e.offsetX, e.offsetY, 3, 0, Math.PI * 2);
+      ctx.arc(x, y, 3, 0, Math.PI * 2);
       ctx.fill();
+
+      // Save stroke to Firebase
+      db.ref("strokes").push({ x, y });
     }
+
+    // Listen for updates from Firebase
+    db.ref("strokes").on("child_added", (snapshot) => {
+      const { x, y } = snapshot.val();
+      ctx.fillStyle = "black";
+      ctx.beginPath();
+      ctx.arc(x, y, 3, 0, Math.PI * 2);
+      ctx.fill();
+    });
   </script>
 </body>
 </html>
