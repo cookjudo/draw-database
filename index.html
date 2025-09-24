@@ -9,13 +9,13 @@
       padding: 0;
       height: 100%;
       width: 100%;
-      overflow: hidden; /* prevent scrolling */
+      overflow: hidden;
     }
     canvas {
       display: block;
-      width: 100vw;   /* viewport width */
-      height: 100vh;  /* viewport height */
-      touch-action: none; /* allow finger drawing */
+      width: 100vw;   /* fill screen */
+      height: 100vh;  /* fill screen */
+      touch-action: none;
     }
     #clearBtn {
       position: fixed;
@@ -36,12 +36,10 @@
   <button id="clearBtn">Clear Canvas</button>
   <canvas id="drawCanvas"></canvas>
 
-  <!-- Firebase v8 SDK -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
   <script>
-    // Firebase config
     const firebaseConfig = {
       apiKey: "AIzaSyCRyA_LYMiQsSGar9MCkhwrVw6kF2nTaXQ",
       authDomain: "draw-database-9eeba.firebaseapp.com",
@@ -59,10 +57,11 @@
     const canvas = document.getElementById("drawCanvas");
     const ctx = canvas.getContext("2d");
 
-    // Always resize canvas to fit screen
     function resizeCanvas() {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = window.innerWidth * dpr;
+      canvas.height = window.innerHeight * dpr;
+      ctx.scale(dpr, dpr);  // scale drawing operations to match screen
       ctx.lineWidth = 2;
       ctx.lineCap = "round";
     }
