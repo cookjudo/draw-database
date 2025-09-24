@@ -22,14 +22,37 @@ canvas.height = CANVAS_HEIGHT;
 let drawing = false;
 let eraseMode = false;
 let lineWidth = 4;
+let currentColor = "rgb(0,0,0)";
 let prevX = null, prevY = null;
 
+// UI elements
 const drawEraseBtn = document.getElementById("drawEraseBtn");
 const clearBtn = document.getElementById("clearBtn");
 const sizeSlider = document.getElementById("sizeSlider");
 const onlineCounter = document.getElementById("onlineCounter");
+const controlsPanel = document.getElementById("controlsPanel");
+const toggleControlsBtn = document.getElementById("toggleControlsBtn");
 
+const rSlider = document.getElementById("rSlider");
+const gSlider = document.getElementById("gSlider");
+const bSlider = document.getElementById("bSlider");
+const colorPreview = document.getElementById("colorPreview");
+
+// Update brush size
 sizeSlider.addEventListener("input", () => { lineWidth = parseInt(sizeSlider.value); });
+
+// Update color
+function updateColor(){
+  const r = rSlider.value;
+  const g = gSlider.value;
+  const b = bSlider.value;
+  currentColor = `rgb(${r},${g},${b})`;
+  colorPreview.style.backgroundColor = currentColor;
+}
+rSlider.addEventListener("input", updateColor);
+gSlider.addEventListener("input", updateColor);
+bSlider.addEventListener("input", updateColor);
+updateColor();
 
 function getCanvasCoords(e){
   const rect = canvas.getBoundingClientRect();
@@ -53,7 +76,7 @@ function endDraw(e){
   prevX = prevY = null;
 }
 
-// Batches for smooth drawing
+// Batching strokes
 let strokeBatch = [];
 const BATCH_INTERVAL = 50; // ms
 
@@ -82,9 +105,9 @@ function draw(e){
 function drawLocally(x, y){
   ctx.beginPath();
   ctx.arc(x, y, lineWidth/2, 0, Math.PI*2);
-  ctx.fillStyle="black";
+  ctx.fillStyle = currentColor;
   ctx.fill();
-  strokeBatch.push({x, y, size: lineWidth});
+  strokeBatch.push({x, y, size: lineWidth, color: currentColor});
 }
 
 function eraseLocally(x, y){
@@ -95,7 +118,7 @@ function eraseLocally(x, y){
   ctx.fill();
   ctx.restore();
 
-  // Remove strokes from database that are within eraser circle
+  // Remove strokes from database within eraser circle
   db.ref("strokes").once("value", snapshot => {
     snapshot.forEach(child => {
       const s = child.val();
@@ -108,7 +131,7 @@ function eraseLocally(x, y){
   });
 }
 
-// Push strokes to database
+// Push strokes batch to database
 setInterval(()=>{
   if(strokeBatch.length>0){
     const batch = {};
@@ -136,9 +159,9 @@ drawEraseBtn.addEventListener("click", ()=>{
   drawEraseBtn.style.backgroundColor = eraseMode?"#2196F3":"#4CAF50";
 });
 
-// Clear canvas with warning for everyone
+// Clear canvas with warning
 clearBtn.addEventListener("click", ()=>{
-  const confirmClear = confirm("Are you sure you want to clear?");
+  const confirmClear = confirm("Are you sure you want to clear the canvas for everyone?");
   if(!confirmClear) return;
 
   ctx.clearRect(0,0,CANVAS_WIDTH,CANVAS_HEIGHT);
@@ -146,42 +169,38 @@ clearBtn.addEventListener("click", ()=>{
   db.ref("strokes").remove();
 });
 
-
 // Render strokes
 db.ref("strokes").on("child_added", snapshot=>{
-  const {x, y, size} = snapshot.val();
+  const {x, y, size, color} = snapshot.val();
   ctx.beginPath();
   ctx.arc(x, y, size/2, 0, Math.PI*2);
-  ctx.fillStyle="black";
+  ctx.fillStyle = color || "black";
   ctx.fill();
 });
 
-// Listen for database removals (clear canvas or erased strokes)
+// Listen for database removals
 db.ref("strokes").on("child_removed", () => {
   ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-  // Re-render remaining strokes
   db.ref("strokes").once("value", snapshot=>{
     snapshot.forEach(child=>{
-      const {x, y, size} = child.val();
+      const {x, y, size, color} = child.val();
       ctx.beginPath();
       ctx.arc(x, y, size/2, 0, Math.PI*2);
-      ctx.fillStyle="black";
+      ctx.fillStyle = color || "black";
       ctx.fill();
     });
   });
 });
 
-// Online counter with persistent user ID
-// Online counter with heartbeat
+// === Online counter with heartbeat ===
 let userId = localStorage.getItem("drawUserId");
 if(!userId){
   userId = "user_" + Math.floor(Math.random()*1000000);
   localStorage.setItem("drawUserId", userId);
 }
-
 let userRef = db.ref("online/" + userId);
 
-// Set initial presence
+// Set presence
 userRef.set({ active: true, lastActive: Date.now() });
 userRef.onDisconnect().remove();
 
@@ -203,3 +222,7 @@ db.ref("online").on("value", snapshot=>{
   onlineCounter.textContent = "Online: " + count;
 });
 
+// Toggle controls panel
+toggleControlsBtn.addEventListener("click", ()=>{
+  controlsPanel.classList.toggle("visible");
+});
