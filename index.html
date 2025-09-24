@@ -139,7 +139,6 @@ function startDraw(e){
   e.preventDefault(); 
   drawing = true; 
   [prevX, prevY] = getCanvasCoords(e); 
-  drawCircle(prevX, prevY); 
 }
 
 function endDraw(e){ 
@@ -148,7 +147,10 @@ function endDraw(e){
   prevX = prevY = null;
 }
 
-// Smooth drawing with step based on brush size
+// Throttle points for batching
+let localStrokes = [];
+const BATCH_INTERVAL = 50; // ms
+
 function draw(e){
   if(!drawing) return;
   e.preventDefault();
@@ -171,23 +173,37 @@ function draw(e){
   prevY = y;
 }
 
-// Draw a single circle and save to Firebase
+// Draw a single circle locally
 function drawDot(x, y){
   ctx.beginPath();
   ctx.arc(x, y, lineWidth/2, 0, Math.PI*2);
   ctx.fillStyle="black";
   ctx.fill();
-  db.ref("strokes").push({x,y,size:lineWidth});
+  localStrokes.push({x,y,size:lineWidth});
 }
+
+// Batch sending points to Firebase
+setInterval(()=>{
+  if(localStrokes.length>0){
+    const batch = localStrokes;
+    localStrokes = [];
+    db.ref("strokes").push(batch);
+  }
+}, BATCH_INTERVAL);
 
 // Erase overlapping strokes from Firebase
 function eraseAt(x, y){
   db.ref("strokes").once("value", snapshot=>{
     snapshot.forEach(child=>{
-      const {x: sx, y: sy, size} = child.val();
-      const radius = size/2;
-      const dist = Math.hypot(x-sx, y-sy);
-      if(dist < lineWidth/2 + radius){ child.ref.remove(); }
+      const val = child.val();
+      if(Array.isArray(val)){ // batch
+        let keep = val.filter(p => Math.hypot(x-p.x, y-p.y) >= lineWidth/2 + p.size/2);
+        if(keep.length === 0) child.ref.remove();
+        else child.ref.set(keep);
+      } else {
+        const {x: sx, y: sy, size} = val;
+        if(Math.hypot(x-sx, y-sy) < lineWidth/2 + size/2) child.ref.remove();
+      }
     });
   });
   ctx.clearRect(x-lineWidth/2, y-lineWidth/2, lineWidth, lineWidth);
@@ -216,13 +232,23 @@ clearBtn.addEventListener("click", ()=>{
   db.ref("strokes").remove();
 });
 
-// Sync strokes from Firebase
+// Render strokes from Firebase
 db.ref("strokes").on("child_added", snapshot=>{
-  const {x,y,size} = snapshot.val();
-  ctx.beginPath();
-  ctx.arc(x,y,size/2,0,Math.PI*2);
-  ctx.fillStyle="black";
-  ctx.fill();
+  const val = snapshot.val();
+  if(Array.isArray(val)){
+    val.forEach(p=>{
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size/2,0,Math.PI*2);
+      ctx.fillStyle="black";
+      ctx.fill();
+    });
+  } else {
+    const {x,y,size} = val;
+    ctx.beginPath();
+    ctx.arc(x,y,size/2,0,Math.PI*2);
+    ctx.fillStyle="black";
+    ctx.fill();
+  }
 });
 
 db.ref("strokes").on("child_removed", snapshot=>{ redrawAll(); });
@@ -232,11 +258,21 @@ function redrawAll(){
   ctx.clearRect(0,0,CANVAS_WIDTH,CANVAS_HEIGHT);
   db.ref("strokes").once("value", snapshot=>{
     snapshot.forEach(child=>{
-      const {x,y,size} = child.val();
-      ctx.beginPath();
-      ctx.arc(x,y,size/2,0,Math.PI*2);
-      ctx.fillStyle="black";
-      ctx.fill();
+      const val = child.val();
+      if(Array.isArray(val)){
+        val.forEach(p=>{
+          ctx.beginPath();
+          ctx.arc(p.x,p.y,p.size/2,0,Math.PI*2);
+          ctx.fillStyle="black";
+          ctx.fill();
+        });
+      } else {
+        const {x,y,size} = val;
+        ctx.beginPath();
+        ctx.arc(x,y,size/2,0,Math.PI*2);
+        ctx.fillStyle="black";
+        ctx.fill();
+      }
     });
   });
 }
