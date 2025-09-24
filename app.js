@@ -55,7 +55,6 @@ function endDraw(e){
 
 // Batches for smooth drawing
 let strokeBatch = [];
-let eraseBatch = [];
 const BATCH_INTERVAL = 50; // ms
 
 function draw(e){
@@ -95,10 +94,21 @@ function eraseLocally(x, y){
   ctx.arc(x, y, lineWidth/2, 0, Math.PI*2);
   ctx.fill();
   ctx.restore();
-  eraseBatch.push({x, y, size: lineWidth});
+
+  // Remove strokes from database that are within eraser circle
+  db.ref("strokes").once("value", snapshot => {
+    snapshot.forEach(child => {
+      const s = child.val();
+      const dx = s.x - x;
+      const dy = s.y - y;
+      if(Math.hypot(dx, dy) <= lineWidth/2){
+        db.ref("strokes/" + child.key).remove();
+      }
+    });
+  });
 }
 
-// Push strokes and erase events
+// Push strokes to database
 setInterval(()=>{
   if(strokeBatch.length>0){
     const batch = {};
@@ -109,18 +119,9 @@ setInterval(()=>{
     db.ref("strokes").update(batch);
     strokeBatch = [];
   }
-  if(eraseBatch.length>0){
-    const batch = {};
-    eraseBatch.forEach(e=>{
-      const key = db.ref("erase").push().key;
-      batch[key] = e;
-    });
-    db.ref("erase").update(batch);
-    eraseBatch = [];
-  }
 }, BATCH_INTERVAL);
 
-// Events
+// Canvas events
 canvas.addEventListener("mousedown", startDraw);
 canvas.addEventListener("mouseup", endDraw);
 canvas.addEventListener("mousemove", draw);
@@ -139,9 +140,7 @@ drawEraseBtn.addEventListener("click", ()=>{
 clearBtn.addEventListener("click", ()=>{
   ctx.clearRect(0,0,CANVAS_WIDTH,CANVAS_HEIGHT);
   strokeBatch = [];
-  eraseBatch = [];
   db.ref("strokes").remove();
-  db.ref("erase").remove();
 });
 
 // Render strokes
@@ -153,23 +152,19 @@ db.ref("strokes").on("child_added", snapshot=>{
   ctx.fill();
 });
 
-// Render erases
-db.ref("erase").on("child_added", snapshot=>{
-  const {x, y, size} = snapshot.val();
-  ctx.save();
-  ctx.globalCompositeOperation = 'destination-out';
-  ctx.beginPath();
-  ctx.arc(x, y, size/2, 0, Math.PI*2);
-  ctx.fill();
-  ctx.restore();
-});
-
-// Listen for database removals (clear canvas)
+// Listen for database removals (clear canvas or erased strokes)
 db.ref("strokes").on("child_removed", () => {
   ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-});
-db.ref("erase").on("child_removed", () => {
-  ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+  // Re-render remaining strokes
+  db.ref("strokes").once("value", snapshot=>{
+    snapshot.forEach(child=>{
+      const {x, y, size} = child.val();
+      ctx.beginPath();
+      ctx.arc(x, y, size/2, 0, Math.PI*2);
+      ctx.fillStyle="black";
+      ctx.fill();
+    });
+  });
 });
 
 // Online counter with persistent user ID
