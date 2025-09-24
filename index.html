@@ -27,6 +27,7 @@
       display: flex;
       gap: 10px;
       align-items: center;
+      flex-wrap: wrap;
     }
     button {
       padding: 10px 15px;
@@ -52,6 +53,10 @@
     }
     #sizeSlider {
       width: 100px;
+      cursor: pointer;
+    }
+    label {
+      color: white;
     }
   </style>
 </head>
@@ -59,11 +64,18 @@
   <div id="controls">
     <button id="drawEraseBtn">Erase</button>
     <button id="clearBtn">Clear Canvas</button>
-    <label>Size: <input type="range" id="sizeSlider" min="1" max="50" value="4"></label>
+    
+    <div style="display:flex; align-items:center; gap:5px;">
+      <label for="sizeSlider">Size:</label>
+      <input type="range" id="sizeSlider" min="1" max="50" value="4">
+    </div>
+
     <div id="onlineCounter">Online: 0</div>
   </div>
+
   <canvas id="drawCanvas"></canvas>
 
+  <!-- Firebase v8 SDK -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
@@ -188,7 +200,7 @@
     });
 
     // Online users counter
-    const userRef = db.ref("online/" + Math.floor(Math.random()*1000000));
+    const userRef = db.ref("online/" + Math.floor(Math.random() * 1000000));
     userRef.set(true);
     userRef.onDisconnect().remove();
 
