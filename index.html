@@ -12,12 +12,12 @@
   <button id="clearBtn">Clear Canvas</button>
   <canvas id="draw" width="800" height="600"></canvas>
 
-  <!-- Firebase SDKs -->
-  <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js"></script>
+  <script type="module">
+    // --- Firebase Imports ---
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js";
+    import { getDatabase, ref, push, onChildAdded, remove } from "https://www.gstatic.com/firebasejs/12.3.0/firebase-database.js";
 
-  <script>
-    // ✅ Your Firebase Config
+    // --- Firebase Config ---
     const firebaseConfig = {
       apiKey: "AIzaSyCRyA_LYMiQsSGar9MCkhwrVw6kF2nTaXQ",
       authDomain: "draw-database-9eeba.firebaseapp.com",
@@ -29,11 +29,12 @@
       measurementId: "G-9TJ9926RHS"
     };
 
-    // Initialize Firebase
-    const app = firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+    // --- Initialize Firebase + DB ---
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const strokesRef = ref(db, "strokes");
 
-    // Canvas setup
+    // --- Canvas Setup ---
     const canvas = document.getElementById("draw");
     const ctx = canvas.getContext("2d");
     ctx.lineWidth = 3;
@@ -62,21 +63,22 @@
       ctx.lineTo(x, y);
       ctx.stroke();
 
+      // Save stroke to Firebase
       if (emit) {
-        db.ref("strokes").push({ x1: lastX, y1: lastY, x2: x, y2: y });
+        push(strokesRef, { x1: lastX, y1: lastY, x2: x, y2: y });
       }
 
       lastX = x;
       lastY = y;
     }
 
-    // --- Mouse events ---
+    // --- Mouse Events ---
     canvas.addEventListener("mousedown", (e) => startDraw(e.offsetX, e.offsetY));
     canvas.addEventListener("mouseup", endDraw);
     canvas.addEventListener("mouseout", endDraw);
     canvas.addEventListener("mousemove", (e) => drawLine(e.offsetX, e.offsetY));
 
-    // --- Touch events ---
+    // --- Touch Events ---
     canvas.addEventListener("touchstart", (e) => {
       const touch = e.touches[0];
       const rect = canvas.getBoundingClientRect();
@@ -87,11 +89,11 @@
       const touch = e.touches[0];
       const rect = canvas.getBoundingClientRect();
       drawLine(touch.clientX - rect.left, touch.clientY - rect.top);
-      e.preventDefault(); // stops scrolling
+      e.preventDefault(); // stop page scrolling
     });
 
-    // --- Firebase listener: draw strokes from others ---
-    db.ref("strokes").on("child_added", (snapshot) => {
+    // --- Listen for strokes from Firebase ---
+    onChildAdded(strokesRef, (snapshot) => {
       const { x1, y1, x2, y2 } = snapshot.val();
       ctx.beginPath();
       ctx.moveTo(x1, y1);
@@ -99,10 +101,10 @@
       ctx.stroke();
     });
 
-    // --- Clear button ---
+    // --- Clear Button ---
     document.getElementById("clearBtn").addEventListener("click", () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      db.ref("strokes").remove(); // clears DB
+      remove(strokesRef); // clears DB for everyone
     });
   </script>
 </body>
