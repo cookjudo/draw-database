@@ -10,31 +10,53 @@
       height: 100%;
       width: 100%;
       overflow: hidden;
+      font-family: sans-serif;
     }
     canvas {
       display: block;
-      width: 100%;   /* scale to fit screen */
-      height: 100%;  /* scale to fit screen */
+      width: 100%;
+      height: 100%;
       touch-action: none;
       border: 1px solid black;
     }
-    #clearBtn {
+    #controls {
       position: fixed;
       top: 10px;
-      right: 10px;
+      left: 10px;
       z-index: 10;
-      padding: 10px 20px;
-      background: red;
-      color: white;
+      display: flex;
+      gap: 10px;
+    }
+    button {
+      padding: 10px 15px;
       border: none;
-      border-radius: 8px;
-      font-size: 16px;
+      border-radius: 6px;
       cursor: pointer;
+      font-size: 14px;
+    }
+    #drawEraseBtn {
+      background-color: #4CAF50;
+      color: white;
+    }
+    #clearBtn {
+      background-color: red;
+      color: white;
+    }
+    #onlineCounter {
+      background-color: #333;
+      color: white;
+      padding: 10px 15px;
+      border-radius: 6px;
+      font-size: 14px;
     }
   </style>
 </head>
 <body>
-  <button id="clearBtn">Clear Canvas</button>
+  <div id="controls">
+    <button id="drawEraseBtn">Erase</button>
+    <button id="clearBtn">Clear Canvas</button>
+    <div id="onlineCounter">Online: 0</div>
+  </div>
   <canvas id="drawCanvas"></canvas>
 
   <!-- Firebase v8 SDK -->
@@ -60,19 +82,24 @@
     const canvas = document.getElementById("drawCanvas");
     const ctx = canvas.getContext("2d");
 
-    // FIXED internal canvas resolution
+    // Fixed internal resolution
     const CANVAS_WIDTH = 1200;
     const CANVAS_HEIGHT = 800;
     canvas.width = CANVAS_WIDTH;
     canvas.height = CANVAS_HEIGHT;
 
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 4;
     ctx.lineCap = "round";
+    ctx.strokeStyle = "black";
 
     let drawing = false;
     let prevX = 0, prevY = 0;
+    let eraseMode = false;
 
-    // Convert screen coordinates to canvas coordinates
+    const drawEraseBtn = document.getElementById("drawEraseBtn");
+    const clearBtn = document.getElementById("clearBtn");
+    const onlineCounter = document.getElementById("onlineCounter");
+
     function getCanvasCoords(e) {
       const rect = canvas.getBoundingClientRect();
       let x, y;
@@ -83,7 +110,6 @@
         x = e.clientX;
         y = e.clientY;
       }
-      // scale to internal canvas resolution
       const scaleX = CANVAS_WIDTH / rect.width;
       const scaleY = CANVAS_HEIGHT / rect.height;
       return [x * scaleX - rect.left * scaleX, y * scaleY - rect.top * scaleY];
@@ -108,11 +134,10 @@
       ctx.beginPath();
       ctx.moveTo(prevX, prevY);
       ctx.lineTo(x, y);
+      ctx.strokeStyle = eraseMode ? "white" : "black";
       ctx.stroke();
 
-      // Save stroke to Firebase
-      db.ref("strokes").push({ x1: prevX, y1: prevY, x2: x, y2: y });
-
+      db.ref("strokes").push({ x1: prevX, y1: prevY, x2: x, y2: y, erase: eraseMode });
       [prevX, prevY] = [x, y];
     }
 
@@ -126,26 +151,43 @@
     canvas.addEventListener("touchend", endDraw);
     canvas.addEventListener("touchmove", draw);
 
-    // Sync strokes from Firebase
-    db.ref("strokes").on("child_added", (snapshot) => {
-      const { x1, y1, x2, y2 } = snapshot.val();
-      ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      ctx.lineTo(x2, y2);
-      ctx.stroke();
+    // Toggle erase/draw
+    drawEraseBtn.addEventListener("click", () => {
+      eraseMode = !eraseMode;
+      drawEraseBtn.textContent = eraseMode ? "Draw" : "Erase";
+      drawEraseBtn.style.backgroundColor = eraseMode ? "#2196F3" : "#4CAF50";
     });
 
-    // Clear button
-    document.getElementById("clearBtn").addEventListener("click", () => {
+    // Clear canvas button
+    clearBtn.addEventListener("click", () => {
       ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
       db.ref("strokes").remove();
     });
 
-    // Clear if DB is emptied
+    // Sync strokes from Firebase
+    db.ref("strokes").on("child_added", (snapshot) => {
+      const { x1, y1, x2, y2, erase } = snapshot.val();
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.strokeStyle = erase ? "white" : "black";
+      ctx.stroke();
+    });
+
     db.ref("strokes").on("value", (snapshot) => {
       if (!snapshot.exists()) {
         ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
       }
+    });
+
+    // Online users counter
+    const userRef = db.ref("online/" + Math.floor(Math.random()*1000000));
+    userRef.set(true);
+    userRef.onDisconnect().remove();
+
+    db.ref("online").on("value", snapshot => {
+      const count = snapshot.numChildren();
+      onlineCounter.textContent = "Online: " + count;
     });
   </script>
 </body>
