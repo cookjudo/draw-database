@@ -18,16 +18,22 @@
       height: 100%;
       touch-action: none;
       border: 1px solid black;
+      position: absolute;
+      top: 0;
+      left: 0;
     }
     #controls {
       position: fixed;
       top: 10px;
       left: 10px;
-      z-index: 10;
+      z-index: 1000; /* always on top */
       display: flex;
       gap: 10px;
-      align-items: center;
       flex-wrap: wrap;
+      align-items: center;
+      background-color: rgba(0,0,0,0.4);
+      padding: 5px 10px;
+      border-radius: 8px;
     }
     button {
       padding: 10px 15px;
@@ -64,12 +70,8 @@
   <div id="controls">
     <button id="drawEraseBtn">Erase</button>
     <button id="clearBtn">Clear Canvas</button>
-    
-    <div style="display:flex; align-items:center; gap:5px;">
-      <label for="sizeSlider">Size:</label>
-      <input type="range" id="sizeSlider" min="1" max="50" value="4">
-    </div>
-
+    <label for="sizeSlider">Size:</label>
+    <input type="range" id="sizeSlider" min="1" max="50" value="4">
     <div id="onlineCounter">Online: 0</div>
   </div>
 
@@ -80,6 +82,7 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
   <script>
+    // Firebase config
     const firebaseConfig = {
       apiKey: "AIzaSyCRyA_LYMiQsSGar9MCkhwrVw6kF2nTaXQ",
       authDomain: "draw-database-9eeba.firebaseapp.com",
