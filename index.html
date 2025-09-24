@@ -1,216 +1,219 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <title>Collaborative Drawing</title>
-  <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      height: 100%;
-      width: 100%;
-      overflow: hidden;
-      font-family: sans-serif;
-    }
-    canvas {
-      display: block;
-      width: 100%;
-      height: 100%;
-      touch-action: none;
-      border: 1px solid black;
-      position: absolute;
-      top: 0;
-      left: 0;
-    }
-    #controls {
-      position: fixed;
-      top: 10px;
-      left: 10px;
-      z-index: 1000; /* always on top */
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      align-items: center;
-      background-color: rgba(0,0,0,0.4);
-      padding: 5px 10px;
-      border-radius: 8px;
-    }
-    button {
-      padding: 10px 15px;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 14px;
-    }
-    #drawEraseBtn {
-      background-color: #4CAF50;
-      color: white;
-    }
-    #clearBtn {
-      background-color: red;
-      color: white;
-    }
-    #onlineCounter {
-      background-color: #333;
-      color: white;
-      padding: 10px 15px;
-      border-radius: 6px;
-      font-size: 14px;
-    }
-    #sizeSlider {
-      width: 100px;
-      cursor: pointer;
-    }
-    label {
-      color: white;
-    }
-  </style>
+<meta charset="UTF-8">
+<title>Collaborative Drawing</title>
+<style>
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  font-family: sans-serif;
+}
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  border: 1px solid black;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+#controls {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  background-color: rgba(0,0,0,0.4);
+  padding: 10px;
+  border-radius: 8px;
+}
+.buttons { display: flex; gap: 10px; }
+button {
+  padding: 10px 15px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+#drawEraseBtn { background-color: #4CAF50; color:white; }
+#clearBtn { background-color: red; color:white; }
+#sizeContainer { display:flex; align-items:center; gap:5px; }
+#sizeSlider { width: 120px; cursor:pointer; }
+#onlineCounter {
+  margin-top: 5px;
+  background-color: #333;
+  color: white;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 14px;
+  text-align: center;
+}
+label { color:white; }
+</style>
 </head>
 <body>
-  <div id="controls">
+<div id="controls">
+  <div class="buttons">
     <button id="drawEraseBtn">Erase</button>
     <button id="clearBtn">Clear Canvas</button>
+  </div>
+  <div id="sizeContainer">
     <label for="sizeSlider">Size:</label>
     <input type="range" id="sizeSlider" min="1" max="50" value="4">
-    <div id="onlineCounter">Online: 0</div>
   </div>
+  <div id="onlineCounter">Online: 0</div>
+</div>
 
-  <canvas id="drawCanvas"></canvas>
+<canvas id="drawCanvas"></canvas>
 
-  <!-- Firebase v8 SDK -->
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyCRyA_LYMiQsSGar9MCkhwrVw6kF2nTaXQ",
+  authDomain: "draw-database-9eeba.firebaseapp.com",
+  databaseURL: "https://draw-database-9eeba-default-rtdb.firebaseio.com",
+  projectId: "draw-database-9eeba",
+  storageBucket: "draw-database-9eeba.firebasestorage.app",
+  messagingSenderId: "351896382644",
+  appId: "1:351896382644:web:a2cd022686853da146fbe1",
+  measurementId: "G-9TJ9926RHS"
+};
 
-  <script>
-    // Firebase config
-    const firebaseConfig = {
-      apiKey: "AIzaSyCRyA_LYMiQsSGar9MCkhwrVw6kF2nTaXQ",
-      authDomain: "draw-database-9eeba.firebaseapp.com",
-      databaseURL: "https://draw-database-9eeba-default-rtdb.firebaseio.com",
-      projectId: "draw-database-9eeba",
-      storageBucket: "draw-database-9eeba.firebasestorage.app",
-      messagingSenderId: "351896382644",
-      appId: "1:351896382644:web:a2cd022686853da146fbe1",
-      measurementId: "G-9TJ9926RHS"
-    };
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
 
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+const canvas = document.getElementById("drawCanvas");
+const ctx = canvas.getContext("2d");
 
-    const canvas = document.getElementById("drawCanvas");
-    const ctx = canvas.getContext("2d");
+const CANVAS_WIDTH = 1200;
+const CANVAS_HEIGHT = 800;
+canvas.width = CANVAS_WIDTH;
+canvas.height = CANVAS_HEIGHT;
 
-    const CANVAS_WIDTH = 1200;
-    const CANVAS_HEIGHT = 800;
-    canvas.width = CANVAS_WIDTH;
-    canvas.height = CANVAS_HEIGHT;
+let drawing = false;
+let eraseMode = false;
+let lineWidth = 4;
 
-    let drawing = false;
-    let prevX = 0, prevY = 0;
-    let eraseMode = false;
-    let lineWidth = 4;
+const drawEraseBtn = document.getElementById("drawEraseBtn");
+const clearBtn = document.getElementById("clearBtn");
+const sizeSlider = document.getElementById("sizeSlider");
+const onlineCounter = document.getElementById("onlineCounter");
 
-    const drawEraseBtn = document.getElementById("drawEraseBtn");
-    const clearBtn = document.getElementById("clearBtn");
-    const sizeSlider = document.getElementById("sizeSlider");
-    const onlineCounter = document.getElementById("onlineCounter");
+// Update size from slider
+sizeSlider.addEventListener("input", () => { lineWidth = parseInt(sizeSlider.value); });
 
-    // Update line width from slider
-    sizeSlider.addEventListener("input", () => {
-      lineWidth = parseInt(sizeSlider.value);
-    });
+function getCanvasCoords(e) {
+  const rect = canvas.getBoundingClientRect();
+  let x, y;
+  if(e.touches && e.touches.length > 0) { x=e.touches[0].clientX; y=e.touches[0].clientY; }
+  else { x=e.clientX; y=e.clientY; }
+  const scaleX = CANVAS_WIDTH / rect.width;
+  const scaleY = CANVAS_HEIGHT / rect.height;
+  return [x*scaleX - rect.left*scaleX, y*scaleY - rect.top*scaleY];
+}
 
-    function getCanvasCoords(e) {
-      const rect = canvas.getBoundingClientRect();
-      let x, y;
-      if (e.touches && e.touches.length > 0) {
-        x = e.touches[0].clientX;
-        y = e.touches[0].clientY;
-      } else {
-        x = e.clientX;
-        y = e.clientY;
-      }
-      const scaleX = CANVAS_WIDTH / rect.width;
-      const scaleY = CANVAS_HEIGHT / rect.height;
-      return [x * scaleX - rect.left * scaleX, y * scaleY - rect.top * scaleY];
-    }
+function startDraw(e){ e.preventDefault(); drawing = true; draw(e); }
+function endDraw(e){ e.preventDefault(); drawing = false; }
 
-    function startDraw(e) {
-      e.preventDefault();
-      drawing = true;
-      [prevX, prevY] = getCanvasCoords(e);
-    }
+function draw(e){
+  if(!drawing) return;
+  e.preventDefault();
+  const [x, y] = getCanvasCoords(e);
+  if(eraseMode) { eraseAt(x, y); }
+  else { drawDot(x, y); }
+}
 
-    function endDraw(e) {
-      e.preventDefault();
-      drawing = false;
-    }
+// Draw a circle
+function drawDot(x, y){
+  ctx.beginPath();
+  ctx.arc(x, y, lineWidth/2, 0, Math.PI*2);
+  ctx.fillStyle="black";
+  ctx.fill();
+  db.ref("strokes").push({x, y, size: lineWidth});
+}
 
-    function draw(e) {
-      if (!drawing) return;
-      e.preventDefault();
-      const [x, y] = getCanvasCoords(e);
-
-      ctx.beginPath();
-      ctx.moveTo(prevX, prevY);
-      ctx.lineTo(x, y);
-      ctx.lineWidth = lineWidth;
-      ctx.strokeStyle = eraseMode ? "white" : "black";
-      ctx.stroke();
-
-      db.ref("strokes").push({ x1: prevX, y1: prevY, x2: x, y2: y, erase: eraseMode, size: lineWidth });
-      [prevX, prevY] = [x, y];
-    }
-
-    // Mouse
-    canvas.addEventListener("mousedown", startDraw);
-    canvas.addEventListener("mouseup", endDraw);
-    canvas.addEventListener("mousemove", draw);
-
-    // Touch
-    canvas.addEventListener("touchstart", startDraw);
-    canvas.addEventListener("touchend", endDraw);
-    canvas.addEventListener("touchmove", draw);
-
-    // Toggle erase/draw
-    drawEraseBtn.addEventListener("click", () => {
-      eraseMode = !eraseMode;
-      drawEraseBtn.textContent = eraseMode ? "Draw" : "Erase";
-      drawEraseBtn.style.backgroundColor = eraseMode ? "#2196F3" : "#4CAF50";
-    });
-
-    // Clear canvas
-    clearBtn.addEventListener("click", () => {
-      ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-      db.ref("strokes").remove();
-    });
-
-    // Sync strokes from Firebase
-    db.ref("strokes").on("child_added", (snapshot) => {
-      const { x1, y1, x2, y2, erase, size } = snapshot.val();
-      ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      ctx.lineTo(x2, y2);
-      ctx.lineWidth = size || 4;
-      ctx.strokeStyle = erase ? "white" : "black";
-      ctx.stroke();
-    });
-
-    db.ref("strokes").on("value", (snapshot) => {
-      if (!snapshot.exists()) {
-        ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+// Erase overlapping strokes from database
+function eraseAt(x, y){
+  db.ref("strokes").once("value", snapshot => {
+    snapshot.forEach(child => {
+      const {x: sx, y: sy, size} = child.val();
+      const radius = size/2;
+      const dist = Math.hypot(x - sx, y - sy);
+      if(dist < lineWidth/2 + radius){ // overlap detected
+        child.ref.remove();
       }
     });
+  });
+  // Optional: visually erase locally
+  ctx.clearRect(x - lineWidth/2, y - lineWidth/2, lineWidth, lineWidth);
+}
 
-    // Online users counter
-    const userRef = db.ref("online/" + Math.floor(Math.random() * 1000000));
-    userRef.set(true);
-    userRef.onDisconnect().remove();
+// Mouse events
+canvas.addEventListener("mousedown", startDraw);
+canvas.addEventListener("mouseup", endDraw);
+canvas.addEventListener("mousemove", draw);
 
-    db.ref("online").on("value", snapshot => {
-      const count = snapshot.numChildren();
-      onlineCounter.textContent = "Online: " + count;
+// Touch events
+canvas.addEventListener("touchstart", startDraw);
+canvas.addEventListener("touchend", endDraw);
+canvas.addEventListener("touchmove", draw);
+
+// Toggle erase/draw
+drawEraseBtn.addEventListener("click", () => {
+  eraseMode = !eraseMode;
+  drawEraseBtn.textContent = eraseMode ? "Draw" : "Erase";
+  drawEraseBtn.style.backgroundColor = eraseMode ? "#2196F3" : "#4CAF50";
+});
+
+// Clear canvas
+clearBtn.addEventListener("click", () => {
+  ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+  db.ref("strokes").remove();
+});
+
+// Sync strokes from Firebase
+db.ref("strokes").on("child_added", snapshot => {
+  const { x, y, size } = snapshot.val();
+  ctx.beginPath();
+  ctx.arc(x, y, size/2, 0, Math.PI*2);
+  ctx.fillStyle = "black";
+  ctx.fill();
+});
+
+db.ref("strokes").on("child_removed", snapshot => {
+  redrawAll();
+});
+
+// Redraw all strokes (after removal)
+function redrawAll(){
+  ctx.clearRect(0,0,CANVAS_WIDTH,CANVAS_HEIGHT);
+  db.ref("strokes").once("value", snapshot => {
+    snapshot.forEach(child => {
+      const {x, y, size} = child.val();
+      ctx.beginPath();
+      ctx.arc(x, y, size/2, 0, Math.PI*2);
+      ctx.fillStyle="black";
+      ctx.fill();
     });
-  </script>
+  });
+}
+
+// Online counter
+const userRef = db.ref("online/"+Math.floor(Math.random()*1000000));
+userRef.set(true);
+userRef.onDisconnect().remove();
+
+db.ref("online").on("value", snapshot => {
+  onlineCounter.textContent = "Online: "+snapshot.numChildren();
+});
+</script>
 </body>
 </html>
