@@ -145,7 +145,11 @@ function endDraw(e){
   prevX = prevY = null;
 }
 
-// Smooth drawing
+// Local micro-batch arrays
+let localStrokes = [];
+let localErasures = [];
+const BATCH_INTERVAL = 30; // ms
+
 function draw(e){
   if(!drawing) return;
   e.preventDefault();
@@ -160,18 +164,121 @@ function draw(e){
   for(let i=0; i<distance; i+=step){
     const cx = prevX + dx * (i/distance);
     const cy = prevY + dy * (i/distance);
-    if(eraseMode) eraseAt(cx, cy);
-    else drawDot(cx, cy);
+    if(eraseMode) eraseLocally(cx, cy);
+    else drawLocally(cx, cy);
   }
 
   prevX = x;
   prevY = y;
 }
 
-// Draw circle and push to Firebase immediately
-function drawDot(x, y){
+// Draw circle locally and batch
+function drawLocally(x, y){
   ctx.beginPath();
   ctx.arc(x, y, lineWidth/2, 0, Math.PI*2);
   ctx.fillStyle="black";
   ctx.fill();
-  db.ref("strokes").push({x,y,size:l
+  localStrokes.push({x, y, size: lineWidth});
+}
+
+// Erase locally and batch
+function eraseLocally(x, y){
+  ctx.clearRect(x-lineWidth/2, y-lineWidth/2, lineWidth, lineWidth);
+  localErasures.push({x, y, size: lineWidth});
+}
+
+// Send batches to Firebase
+setInterval(()=>{
+  if(localStrokes.length>0){
+    const batch = localStrokes;
+    localStrokes = [];
+    db.ref("strokes").push(batch);
+  }
+  if(localErasures.length>0){
+    const batch = localErasures;
+    localErasures = [];
+    db.ref("erasures").push(batch);
+  }
+}, BATCH_INTERVAL);
+
+// Mouse & touch events
+canvas.addEventListener("mousedown", startDraw);
+canvas.addEventListener("mouseup", endDraw);
+canvas.addEventListener("mousemove", draw);
+canvas.addEventListener("touchstart", startDraw);
+canvas.addEventListener("touchend", endDraw);
+canvas.addEventListener("touchmove", draw);
+
+// Toggle draw/erase
+drawEraseBtn.addEventListener("click", ()=>{
+  eraseMode=!eraseMode;
+  drawEraseBtn.textContent=eraseMode?"Draw":"Erase";
+  drawEraseBtn.style.backgroundColor=eraseMode?"#2196F3":"#4CAF50";
+});
+
+// Clear canvas
+clearBtn.addEventListener("click", ()=>{
+  ctx.clearRect(0,0,CANVAS_WIDTH,CANVAS_HEIGHT);
+  db.ref("strokes").remove();
+  db.ref("erasures").remove();
+});
+
+// Render strokes from Firebase
+db.ref("strokes").on("child_added", snapshot=>{
+  const val = snapshot.val();
+  if(Array.isArray(val)){
+    val.forEach(p=>{
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size/2, 0, Math.PI*2);
+      ctx.fillStyle="black";
+      ctx.fill();
+    });
+  }
+});
+
+// Apply erasures from Firebase
+db.ref("erasures").on("child_added", snapshot=>{
+  const val = snapshot.val();
+  if(Array.isArray(val)){
+    val.forEach(p=>{
+      ctx.clearRect(p.x-p.size/2, p.y-p.size/2, p.size, p.size);
+    });
+  }
+});
+
+// Redraw all strokes after clearing
+function redrawAll(){
+  ctx.clearRect(0,0,CANVAS_WIDTH,CANVAS_HEIGHT);
+  db.ref("strokes").once("value", snapshot=>{
+    snapshot.forEach(child=>{
+      const val = child.val();
+      if(Array.isArray(val)){
+        val.forEach(p=>{
+          ctx.beginPath();
+          ctx.arc(p.x,p.y,p.size/2,0,Math.PI*2);
+          ctx.fillStyle="black";
+          ctx.fill();
+        });
+      }
+    });
+  });
+}
+
+// Online counter with mobile visibility fix
+let userRef = db.ref("online/" + Math.floor(Math.random()*1000000));
+function registerOnline(){
+  userRef.set(true);
+  userRef.onDisconnect().remove();
+}
+registerOnline();
+db.ref("online").on("value", snapshot=>{
+  onlineCounter.textContent = "Online: " + snapshot.numChildren();
+});
+document.addEventListener("visibilitychange", ()=>{
+  if(document.visibilityState === "visible"){
+    registerOnline();
+  }
+});
+</script>
+</body>
+</html>
