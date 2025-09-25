@@ -84,7 +84,7 @@ function drawLocally(x, y){
   ctx.lineTo(x, y);
   ctx.stroke();
 
-  strokeBatch.push({x, y, size: lineWidth});
+  strokeBatch.push({x1: prevX, y1: prevY, x2: x, y2: y, size: lineWidth, erase: false});
 }
 
 function eraseLocally(x, y){
@@ -95,19 +95,7 @@ function eraseLocally(x, y){
   ctx.fill();
   ctx.restore();
 
-  // Remove only if the full dot is covered
-  db.ref("strokes").once("value", snapshot => {
-    snapshot.forEach(child => {
-      const s = child.val();
-      const dx = s.x - x;
-      const dy = s.y - y;
-      const distance = Math.hypot(dx, dy);
-
-      if(distance + s.size/2 <= lineWidth/2){  
-        db.ref("strokes/" + child.key).remove();
-      }
-    });
-  });
+  strokeBatch.push({x1: x, y1: y, x2: x, y2: y, size: lineWidth, erase: true});
 }
 
 // Push strokes to database
@@ -148,28 +136,27 @@ clearBtn.addEventListener("click", ()=>{
   db.ref("strokes").remove();
 });
 
-// Render strokes
+// Render strokes from DB
 db.ref("strokes").on("child_added", snapshot=>{
-  const {x, y, size} = snapshot.val();
-  ctx.beginPath();
-  ctx.arc(x, y, size/2, 0, Math.PI*2);
-  ctx.fillStyle="black";
-  ctx.fill();
-});
+  const s = snapshot.val();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.lineWidth = s.size;
 
-// Listen for database removals (clear canvas or erased strokes)
-db.ref("strokes").on("child_removed", () => {
-  ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-  // Re-render remaining strokes
-  db.ref("strokes").once("value", snapshot=>{
-    snapshot.forEach(child=>{
-      const {x, y, size} = child.val();
-      ctx.beginPath();
-      ctx.arc(x, y, size/2, 0, Math.PI*2);
-      ctx.fillStyle="black";
-      ctx.fill();
-    });
-  });
+  if(s.erase){
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.beginPath();
+    ctx.arc(s.x1, s.y1, s.size/2, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  } else {
+    ctx.strokeStyle = "black";
+    ctx.beginPath();
+    ctx.moveTo(s.x1, s.y1);
+    ctx.lineTo(s.x2, s.y2);
+    ctx.stroke();
+  }
 });
 
 // Online counter with heartbeat
