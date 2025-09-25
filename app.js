@@ -136,7 +136,7 @@ clearBtn.addEventListener("click", ()=>{
   db.ref("strokes").remove();
 });
 
-// Render strokes from DB
+// Render strokes from DB (backwards compatible)
 db.ref("strokes").on("child_added", snapshot=>{
   const s = snapshot.val();
   ctx.lineCap = "round";
@@ -147,15 +147,22 @@ db.ref("strokes").on("child_added", snapshot=>{
     ctx.save();
     ctx.globalCompositeOperation = 'destination-out';
     ctx.beginPath();
-    ctx.arc(s.x1, s.y1, s.size/2, 0, Math.PI*2);
+    ctx.arc(s.x1 ?? s.x, s.y1 ?? s.y, s.size/2, 0, Math.PI*2);
     ctx.fill();
     ctx.restore();
-  } else {
+  } else if(s.x1 !== undefined && s.y1 !== undefined && s.x2 !== undefined && s.y2 !== undefined) {
+    // New format: line segment
     ctx.strokeStyle = "black";
     ctx.beginPath();
     ctx.moveTo(s.x1, s.y1);
     ctx.lineTo(s.x2, s.y2);
     ctx.stroke();
+  } else {
+    // Old format: dot
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.size/2, 0, Math.PI*2);
+    ctx.fillStyle = "black";
+    ctx.fill();
   }
 });
 
